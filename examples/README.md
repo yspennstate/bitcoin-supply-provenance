@@ -22,16 +22,18 @@ The list is by transaction output. No address is named and no addresses are clus
 
 `multihop_57043.json` follows output 0 of transaction
 `a1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d`, mined at height 57,043, which pays 10,000 BTC from
-131 inputs:
+131 inputs. Its fields are the output (`txid`, `vout`, `height`, `value` in satoshis, `inputs`), its runs
+(`nruns`, and `runs` as [height, sats] in first-in-first-out order) and a summary of the paths behind them (`pieces`,
+`hops`, `deepest_path_txs`, `deepest_path_blocks`, `deepest_path_nblocks`).
 
-    {"txid": ..., "vout": 0, "height": 57043, "value": ..., "inputs": 131, "nruns": 952, "runs": [[height, sats], ...], "hops": {...}}
-
-Its 10,000 BTC fall into 952 runs from coinbases of 211 blocks mined between heights 24,097 and 56,787. 181 runs are
-whole 50 BTC coinbases, and the other 950 BTC arrive in 771 smaller pieces, many of 0.01 or 0.02 BTC. For each run,
-`hops` counts the transactions its satoshis passed through after leaving the coinbase, this one included. The median run
-passed through 185 transactions and the longest through 1,005: a chain of 1,005 transactions confirmed in 12 blocks
-between heights 51,646 and 57,043, each spending an output of the one before. Only 122 runs went through two
-transactions, a coinbase output spent once and then spent here.
+The 10,000 BTC fall into 952 runs from coinbases of 211 blocks mined between heights 24,097 and 56,787. 181 runs are
+exactly 50 BTC, each from a different block, and the other 950 BTC arrive in 771 smaller runs, many of 0.01 or 0.02 BTC.
+Before neighbouring runs from the same block are joined, the satoshis arrive in 1,152 pieces, each along one path of
+spends from a coinbase output to this transaction. `hops` counts the transactions on that path, this one included:
+the median piece passed through 204 transactions, one in ten through more than 615, and the longest through 1,005, a
+chain confirmed in 12 blocks between heights 51,646 and 57,043 in which each transaction spends an output of the one
+before. At the other end, 122 pieces holding 6,099.01 BTC passed through one transaction between their coinbase and
+this one.
 
 The state at height 57,043 has digest `26b1f215ab44e3b0f58068bd0f62ebf2` (45,393 live outputs, 59,901 runs). The states
 computed on the way at heights 19,999 to 59,999 equal the rows in `../results/rows_fifo_native_0_320043.jsonl`. The 952
