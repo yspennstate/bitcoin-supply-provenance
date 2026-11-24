@@ -1,0 +1,14 @@
+height 396249: 396250 blocks; 71576 hold exactly their subsidy, 175393 less, 149281 more
+total short: 110.19768818 BTC
+  block 91722: -50.00000000 BTC
+  block 91812: -50.00000000 BTC
+  block 96089: -33.08994156 BTC
+  block 37822: -30.95509163 BTC
+  block 256348: -23.25474423 BTC
+  block 117374: -21.17106422 BTC
+  block 149371: -20.07465182 BTC
+  block 69209: -19.11373748 BTC
+  block 21485: -17.71868222 BTC
+  block 18826: -16.89121353 BTC
+  block 171921: -15.94272811 BTC
+  block 29190: -15.70679119 BTC

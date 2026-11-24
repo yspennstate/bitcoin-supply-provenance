@@ -1,0 +1,138 @@
+\documentclass[11pt]{amsart}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{hyperref}
+\emergencystretch=2em
+
+\title{First-in-first-out provenance of the Bitcoin supply to height 396{,}249}
+\author{Yitzchak Shmalo}
+\address{Einstein Institute of Mathematics, The Hebrew University of Jerusalem, Jerusalem, Israel}
+\email{yitzchak.shmalo@gmail.com}
+\date{}
+
+\begin{document}
+\begin{abstract}
+Under the first-in-first-out rule every satoshi in a Bitcoin transaction output can be traced through the transaction graph to a coinbase output; under the rule used here a fee is credited to the block whose coinbase collects it. We compute this assignment for every unspent output up to height $396{,}249$ (February 2016) with bounded memory. At that height the $34{,}113{,}505$ unspent outputs carry $173{,}668{,}290$ runs, every live satoshi is assigned to a mining block, and the live total is $110.19768818$ BTC below the scheduled subsidy: $100$ BTC are the two coinbase outputs overwritten by duplicate transactions, and $10.19768818$ BTC is held by no live output. Two pipelines give the same digest of the full state at nine heights between $381{,}249$ and $391{,}249$, and a sharded store makes the write per step proportional to the new coins of the step rather than to the state.
+\end{abstract}
+\keywords{Bitcoin, unspent transaction outputs, first-in-first-out, provenance, supply verification}
+\maketitle
+
+\section{Introduction}
+
+The Bitcoin protocol fixes the issuance: the coinbase transaction of block $h$ may create at most $50 \cdot 2^{-\lfloor h/210000\rfloor}$ BTC plus the fees of the block's transactions~\cite{Nak08}. Whether the coins that exist today add up to that schedule can be checked by anyone who runs a full node. Bitcoin Core reports the total value of the unspent output set and, with its coin statistics index, the amounts that are provably unspendable~\cite{CoreStats}. The best-known discrepancies are documented: the coinbase outputs of blocks $91{,}722$ and $91{,}812$ were overwritten by transactions with the same identifiers in blocks $91{,}842$ and $91{,}880$, which led to BIP~30~\cite{BIP30} and later BIP~34~\cite{BIP34}, and a number of miners claimed less than the reward available to them.
+
+A total, however, says nothing about where the existing coins came from. Under a first-in-first-out (FIFO) rule each output of a transaction is filled by the input value in order, so each live satoshi has a definite ancestry back to the coinbase output that minted it. The rule is the one the English courts adopted for running accounts in Clayton's case (Devaynes v Noble, 1816), and Anderson, Shumailov, Ahmed and Rietmann~\cite{ASAR18} proposed it for Bitcoin taint tracking in place of the poison and haircut rules of M\"oser, B\"ohme and Breuker~\cite{MBB14}. They observed that FIFO, unlike haircut, loses no information: the ancestry of any output can be recovered. Ordinal theory~\cite{Ord} numbers satoshis in the order they are mined and moves them from inputs to outputs by the same rule, with transaction fees passed to the coinbase of the block in order.
+
+Most work on following coins goes forward from a few chosen outputs. BlockSci~\cite{BlockSci} loads the chain into an in-memory analytical database on which such analyses are written; Tironsakkul, Maarek, Eross and Just~\cite{TMEJ19} compare the poison, haircut and FIFO rules on theft cases. The \texttt{ord} indexer~\cite{Ord} keeps, when its satoshi index is on, the ordinal ranges of every unspent output, which is the assignment of our fee-carry rule below at the level of single satoshis; it is built from a node that keeps the transaction index, which a pruned node cannot do. Bitcoin Core's coin statistics index commits to the unspent set with the MuHash3072 set hash~\cite{CoreMuHash}, so that two nodes can compare their sets by one value. The digest used here plays the same part for the FIFO state, but it is a sum and an exclusive or of 64-bit hashes and is not collision-resistant: it detects disagreement between two honest computations, not tampering. What we add is the reconciliation of the live supply with the issuance schedule, with the gap split into its causes; the assignment under the fee-stopping rule, which ties each coin to the block where it was last minted or collected as a fee; a digest cross-check of two pipelines; and a computation small enough for one Apple Mac mini with 16\,GB of memory and a pruned node.
+
+This note reports the FIFO assignment of the whole live supply, computed by streaming the chain with bounded memory, together with the checks that the computation is correct and its cost. The new parts are the reconciliation of the whole live set, assigned to mining blocks, with the issuance schedule; a cross-check of two pipelines by a digest of the full state; and a sharded store whose write per step is proportional to the new coins of the step rather than to the state. Section~\ref{sec:rule} states the transfer rule, Section~\ref{sec:res} gives the state at height $396{,}249$, Section~\ref{sec:checks} the checks and Section~\ref{sec:cost} the cost. The tables, the recorded checks and example traces are in~\cite{Repo}; the engine is not released.
+
+\section{The transfer rule and the state}\label{sec:rule}
+
+The inputs of a non-coinbase transaction are concatenated in their order in the transaction, and each input contributes the sequence of labelled runs it carries; a \emph{run} is a pair (source, value), where the source is a coinbase output identified by its block height and output index. The outputs are then filled in order from this sequence, splitting a run where an output boundary falls inside it, and adjacent runs with the same source are merged. What is left after the last output is the transaction's fee.
+
+The fee can be treated in two ways. In the \emph{fee-stopping} rule, which gives every figure of Sections~\ref{sec:res} and~\ref{sec:checks}, the fee runs end at the transaction, and each coinbase output carries one run whose source is that output, for its whole value. A source then means the block in which the coins were last minted or collected as fees. In the \emph{fee-carry} rule the fee runs of a block are kept in order; at the end of the block each coinbase output takes first its share of the newly minted value $N = \max(V - F, 0)$, where $V$ is the total value of the coinbase outputs and $F$ the total fee, and then fee runs in order. This is the transfer rule of ordinal theory~\cite{Ord} at the granularity of runs. Under fee-carry, the live value carrying the sources of block $h$ equals $N_h$, which is the subsidy unless the coinbase claimed less. Under fee-stopping it equals the value of the block's coinbase outputs, fees included, minus what later fees carried away, so per-block totals differ from the subsidy in both directions while the sum over all blocks is the same.
+
+The state at height $h$ is the set of live outputs with their runs, together with a table of live transactions. Every output of positive value is live until it is spent, whatever its script; so, unlike the unspent-output set of Bitcoin Core, the live set includes provably unspendable outputs of positive value, and outputs of value zero are counted but not stored. Its digest is order-free: for each live output (ordinal, value, runs) and each live transaction (base, live count) a $64$-bit hash of the record is formed, and the digest is the pair formed by the sum modulo $2^{64}$ and the exclusive or of these hashes, printed as $32$ hexadecimal digits. Two computations are taken to agree when the digest and the three counts (live outputs, runs, live transactions) are equal.
+
+\section{Results at height 396{,}249}\label{sec:res}
+
+Table~\ref{tab:396} gives the state at height $396{,}249$. The sum of the run values equals the total value of the live outputs, so no value is created or lost by the bookkeeping, and every one of the $1{,}881{,}618$ sources that still holds live value is mapped to its block.
+
+\begin{table}[tbp]
+\centering
+\begin{tabular}{lr}
+\toprule
+live outputs & $34{,}113{,}505$ \\
+runs & $173{,}668{,}290$ \\
+live value & $1{,}515{,}613{,}980{,}231{,}182$ sat \\
+scheduled subsidy to this height & $1{,}515{,}625{,}000{,}000{,}000$ sat \\
+difference & $110.19768818$ BTC \\
+\quad coinbases of blocks $91{,}722$ and $91{,}812$, overwritten & $100$ BTC \\
+\quad held by no live output & $10.19768818$ BTC \\
+live value assigned to a mining block & $100.00\%$ \\
+\bottomrule
+\end{tabular}
+\medskip
+\caption{The FIFO state at height $396{,}249$. The schedule counts the 50 BTC output of the genesis block, which is also counted live here.}
+\label{tab:396}
+\end{table}
+
+The genesis output is counted as live in Table~\ref{tab:396}. Bitcoin Core does not add it to the unspent set, because the genesis coinbase is not indexed; under that convention the difference is $160.19768818$ BTC. The $100$ BTC of the overwritten coinbases agrees with the published account of the duplicate transactions~\cite{BIP30}. The remaining $10.19768818$ BTC is held by no live output. Rewards that coinbase transactions left unclaimed are a known source of such a gap; a split of this amount by block, and so a check that all of it is unclaimed reward, needs the fee-carry rule, because under fee-stopping the per-block totals also move with fees.
+
+By era, $69.17\%$ of the live value at height $396{,}249$ was mined in the first subsidy era (heights $0$ to $209{,}999$, 50 BTC per block) and $30.83\%$ in the second. By stretches of $10{,}000$ blocks the shares are $3.29$--$3.30\%$ in the first era and $1.65$--$1.66\%$ in the second (the last, partial stretch, $390{,}000$ to $396{,}249$, holds $1.04\%$), which is the issuance schedule itself: $500{,}000$ BTC per stretch in the first era and $250{,}000$ in the second, out of a supply of about $15.16$ million. This table is a consistency check rather than a finding about coin movement, since FIFO preserves value and almost all minted value is still live.
+
+\section{Correctness checks}\label{sec:checks}
+
+\emph{Two pipelines.} The first pipeline streams the blocks through the engine from a full checkpoint and rewrites the whole state at each stretch of $1{,}250$ blocks. The second, incremental pipeline keeps the state in a store sharded by output and by transaction, extracts only the outputs that the next stretch touches, runs the same transfer rule on that subset, and writes back the changed shards. It reproduced the stream at $381{,}249$ by extracting the subset, running the engine on it and merging the result into a full checkpoint, and from $382{,}499$ to $391{,}249$ by writing into the sharded store. Its recorded results are in the repository. The two agree in digest and counts at the nine heights $381{,}249 + 1{,}250\,j$, $j = 0, \dots, 8$, that is from $381{,}249$ to $391{,}249$; for example
+\begin{center}\small
+\begin{tabular}{rlrrr}
+\toprule
+height & digest & outputs & runs & transactions \\
+\midrule
+$382{,}499$ & \texttt{e55793b44bca808dad70957c8c4d9dc3} & $32{,}410{,}756$ & $150{,}769{,}153$ & $7{,}420{,}685$ \\
+$391{,}249$ & \texttt{bb2ac502a812eb1fd24c1782d7affc8b} & $33{,}400{,}440$ & $164{,}720{,}903$ & $8{,}311{,}341$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+From $383{,}749$ on, the store reached each of these heights from nothing but its own previous state. Both pipelines call the same transfer engine, so this check tests the store, the extraction of subsets and the merge; the transfer rule itself is tested by the comparison of implementations below.
+
+\emph{Two implementations.} A second implementation of the engine in C, written separately from the first, and an independent Python implementation of the same rule agree at all $32$ checkpoints $9{,}999, 19{,}999, \dots, 319{,}999$. The Python implementation reads a different input format and records no digest, so the comparison there is field by field: live outputs, runs, sources, transactions, live transactions and the distribution of runs per output. A test runs both C engines on the first $10{,}000$ blocks (its log is in the repository); both give the digest \texttt{80e12550bcd736b3423665e4284dda63} at height $9{,}999$, the checkpoint read back gives the same digest, and the live value is exactly $10{,}000 \times 50$ BTC.
+
+\emph{Conservation.} At every checkpoint the run values sum to the live output values, and the issuance reconciliation of Section~\ref{sec:res} holds.
+
+\section{Cost}\label{sec:cost}
+
+The computation runs on one Apple Mac mini with 16\,GB of memory and a pruned node. The incremental step on one stretch uses at most $0.40$\,GB; the full-state streaming run peaks at about $5$\,GB at this height. Table~\ref{tab:cost} shows what one stretch of $1{,}250$ blocks (heights $381{,}250$ to $382{,}499$) writes under three designs of the state.
+
+\begin{table}[tbp]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+design & written & time & memory & disk at peak \\
+\midrule
+whole state rewritten & $1{,}571$\,MB & $89$\,s & $0.40$\,GB & about $3.1$\,GB \\
+outputs sharded & $599$\,MB & $19.6$\,s & $0.31$\,GB & $2{,}095$\,MB \\
+outputs and transactions sharded & $342$\,MB & $16.0$\,s & $0.31$\,GB & $1{,}828$\,MB \\
+\bottomrule
+\end{tabular}
+\medskip
+\caption{One stretch of $1{,}250$ blocks under three designs of the state. All three rows are the incremental step; they differ in how the result is written back, and memory is the peak of the write-back.}
+\label{tab:cost}
+\end{table}
+
+Of the $342$\,MB, $201$\,MB are the stretch's own new coins, which any design must write; the older shards are not touched. A whole-state rewrite grows with the state and, extrapolated to the present chain height, would need more disk than the machine has, while the sharded store writes about the size of each stretch. The tables of Section~\ref{sec:res} are produced from the store in $29$\,s. The streaming pipeline continued to height $412{,}499$, where the state has $38{,}136{,}405$ live outputs and $207{,}470{,}912$ runs.
+
+\section{Limits and further work}
+
+The figures here stop at height $396{,}249$; the chain is now near height $976{,}000$, and the number of runs grows faster than the number of outputs: from height $396{,}249$ to $412{,}499$ the outputs grow by $12\%$ and the runs by $19\%$, and the fee-carry rule, which keeps the history of fees, has more runs again. Carrying the reconciliation to the tip, with the fee-carry rule so that the under-claimed rewards can be listed block by block, needs a full node and more memory and disk than the present machine. The released tables are aggregates by block and by era; no address is named and no addresses are clustered.
+
+\section*{Acknowledgements and funding}
+The research presented in this paper was supported by the European Research Council (ERC) under the European Union's Horizon Europe research and innovation programme (grant agreement No.~101041711), by the Simons Foundation as part of the Collaboration on the Mathematical and Scientific Foundations of Deep Learning, by Heights Labs, by Convex Nexus Capital, by the Israel Science Foundation (grant number 2258/19), and by the Israel Science Foundation (ISF Grant 4101/25).
+
+This work was done by AI agents connected to Math Brain~\cite{MathBrainPaper,MathBrainRepo} and working inside the Brain framework~\cite{BrainFramework}, a shared, persistent memory in which the agents record claims, methods, failed attempts and tests, retrieve one another's results, coordinate who works on what, and audit each other's work.
+
+\section*{Declaration of competing interest}
+The author holds equity in Heights Labs and in Convex Nexus Capital and has a management role at Convex Nexus Capital. These entities are included in the funding declaration above.
+
+\section*{Declaration of generative AI and AI-assisted technologies}
+AI agents working through Math Brain, Claude models of Anthropic among them, wrote and ran the ledger engines, the sharded store and the checks, and prepared the manuscript. The author directed the work and is responsible for the content of the paper and for decisions concerning its dissemination.
+
+\begin{thebibliography}{99}
+\bibitem{ASAR18} R.~Anderson, I.~Shumailov, M.~Ahmed and A.~Rietmann, Bitcoin redux, Workshop on the Economics of Information Security (WEIS), Innsbruck, 2018, \url{https://www.cl.cam.ac.uk/~rja14/Papers/bitcoin-redux-weis2018.pdf}.
+\bibitem{BIP30} P.~Wuille, BIP 30: Duplicate transactions, 2012, \url{https://github.com/bitcoin/bips/blob/master/bip-0030.mediawiki}.
+\bibitem{BIP34} G.~Andresen, BIP 34: Block v2, height in coinbase, 2012, \url{https://github.com/bitcoin/bips/blob/master/bip-0034.mediawiki}.
+\bibitem{BlockSci} H.~Kalodner, M.~M\"oser, K.~Lee, S.~Goldfeder, M.~Plattner, A.~Chator and A.~Narayanan, BlockSci: design and applications of a blockchain analysis platform, in: 29th USENIX Security Symposium, 2020, 2721--2738.
+\bibitem{CoreMuHash} F.~Jahr, Coinstats index, Bitcoin Core pull request 19521, merged 2021, \url{https://github.com/bitcoin/bitcoin/pull/19521}.
+\bibitem{CoreStats} Bitcoin Core, \texttt{gettxoutsetinfo} and the coin statistics index, \url{https://bitcoincore.org/en/doc/}.
+\bibitem{MBB14} M.~M\"oser, R.~B\"ohme and D.~Breuker, Towards risk scoring of Bitcoin transactions, in: Financial Cryptography and Data Security, FC 2014 Workshops, Lecture Notes in Computer Science 8438, Springer, 2014, 16--32.
+\bibitem{Nak08} S.~Nakamoto, Bitcoin: a peer-to-peer electronic cash system, 2008, \url{https://bitcoin.org/bitcoin.pdf}.
+\bibitem{Ord} C.~Rodarmor, Ordinal theory, \url{https://docs.ordinals.com/overview.html}.
+\bibitem{TMEJ19} T.~Tironsakkul, M.~Maarek, A.~Eross and M.~Just, Probing the mystery of cryptocurrency theft: an investigation into methods for taint analysis, preprint, 2019, arXiv:1906.05754.
+\bibitem{Repo} Y.~Shmalo, Bitcoin supply provenance: tables and checks, 2026, \url{https://github.com/yspennstate/bitcoin-supply-provenance}.
+\bibitem{MathBrainPaper} Y.~Shmalo, Math Brain: shared, auditable memory for multi-agent mathematical research, preprint, 2026; Zenodo, doi:10.5281/zenodo.24150837.
+\bibitem{MathBrainRepo} Y.~Shmalo, \emph{Math Brain: public snapshot, code and tests}, 2026, \url{https://github.com/yspennstate/math-brain-public}.
+\bibitem{BrainFramework} Y.~Shmalo, \emph{Brain Framework}, public software repository, 2026, \url{https://github.com/yspennstate/brain-framework-public}.
+\end{thebibliography}
+\end{document}

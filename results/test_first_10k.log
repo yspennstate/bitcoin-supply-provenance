@@ -1,0 +1,46 @@
+ok   empty
+ok   abc
+ok   448-bit
+ok   genesis block hash
+ALL OK
+10000 headers, chain 0-9999, tip 00000000fbc97cc6c599ce9c24dd4a2243e2bfd518eda56e1d5e47d29e29c3a7
+{"last": 9999, "sources": 10000, "file": "srcmap.bin"}
+spend_age block 9999 spends 625 same_stretch 364 (58.24%, stretch 1250) age 0:18 1:6 2-6:7 7-36:2 37-144:33 145-1008:466 1009+:93 pre_run:0
+arena: 0 sweeps, 0 grows, 0 dead records dropped, top 4163 of cap 16777216
+stop: end of range, 0.1 s, peak rss 0.07 GB
+compact3: digest 80e12550bcd736b3423665e4284dda63 live_out 9494 runs 10021 live_tx 9489
+stop: end of range, 0.1 s, peak rss 0.08 GB
+native: digest 80e12550bcd736b3423665e4284dda63 live_out 9494 runs 10021 live_tx 9489
+spend_age block 9999 spends 625 same_stretch 364 (58.24%, stretch 1250) age 0:18 1:6 2-6:7 7-36:2 37-144:33 145-1008:466 1009+:93 pre_run:0
+arena: 0 sweeps, 0 grows, 0 dead records dropped, top 4163 of cap 16777216
+stop: end of range, 0.1 s, peak rss 0.07 GB
+compact3_cc: digest 80e12550bcd736b3423665e4284dda63 live_out 9494 runs 10021 live_tx 9489
+ck_compact3/ckpt_0009999.bin: height 9999 live_out 9494 runs 10021 (header 10021) live_tx 9489 digest 80e12550bcd736b3423665e4284dda63 value_mismatch 0
+ck_native/ckpt_0009999.bin: height 9999 live_out 9494 runs 10021 (header 10021) live_tx 9489 digest 80e12550bcd736b3423665e4284dda63 value_mismatch 0
+ck_compact3_cc/ckpt_0009999.bin: height 9999 live_out 9494 runs 10021 (header 10021) live_tx 9489 digest 80e12550bcd736b3423665e4284dda63 value_mismatch 0
+init store: height 9999, 4 shards, live_out 9494, runs 10021, live_tx 9489, 0.4 MB on disk
+height 9999: 9494 live outputs, 10021 runs, 50000000000000 sats in 0 s
+store live_out 9494 runs 10021; runs sum to the live values (50000000000000) -> EQUAL
+subsidy issued through 9999: 50000000000000 sats; live total is 0.00000000 BTC less (subsidy_audit.py lists it by block)
+mapped to a block: 100.00% of live sats (10000 of 10000 sources with live sats)
+
+live sats by the era their coins were mined (FIFO), height 9999:
+  era 1, 50 BTC (0-209999)     100.00%   500000.00000000 BTC
+  not mapped yet                 0.00%        0.00000000 BTC
+
+by 10,000 blocks (share of live sats):
+       0-  9999 100.00%
+height 9999: 10000 blocks; 9998 hold exactly their subsidy, 1 less, 1 more
+total short: 0.00000000 BTC
+  block 2676: -2.01000000 BTC
+  block 2817: +2.01000000 BTC
+issued 50000000000000, live 50000000000000, listed short 0 -> EQUAL
+resumed at height 10000: 9494 live outputs, 10021 runs, 9489 live txs
+resumed at height 10000: 9494 live outputs, 10021 runs, 9489 live txs
+query: store height 9999, 300 queries, 300 live
+query:      300 outputs, 300 live in the store
+query lines identical
+srcblock: every run has a block
+export (gz shards): digest 80e12550bcd736b3423665e4284dda63
+export (p shards): digest 80e12550bcd736b3423665e4284dda63
+ALL OK
